@@ -8,7 +8,9 @@ import ModelDetailPage from './pages/models/ModelDetail';
 import ModelCreatePage from './pages/models/ModelCreate';
 import VersionCreatePage from './pages/models/VersionCreate';
 import InferenceExecutePage from './pages/inference/InferenceExecute';
+import InferenceDeployPage from './pages/deploy/InferenceDeploy';
 import JobListPage from './pages/jobs/JobList';
+import TaskLogsPage from './pages/jobs/TaskLogs';
 import TrainingJobCreatePage from './pages/jobs/TrainingJobCreate';
 import InferenceJobCreatePage from './pages/jobs/InferenceJobCreate';
 import HealthCheckPage from './pages/health/HealthCheck';
@@ -34,7 +36,9 @@ export default function App() {
         <Route path="models/:name" element={<ModelDetailPage />} />
         <Route path="models/:name/versions/create" element={<VersionCreatePage />} />
         <Route path="inference/execute" element={<InferenceExecutePage />} />
+        <Route path="inference/deploy" element={<InferenceDeployPage />} />
         <Route path="jobs" element={<JobListPage />} />
+        <Route path="jobs/:taskId/logs" element={<TaskLogsPage />} />
         <Route path="jobs/training/create" element={<TrainingJobCreatePage />} />
         <Route path="jobs/inference/create" element={<InferenceJobCreatePage />} />
         <Route path="health" element={<HealthCheckPage />} />
