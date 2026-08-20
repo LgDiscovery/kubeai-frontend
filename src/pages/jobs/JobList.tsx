@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Table, Button, Space, Tag, Typography, Select, message, Popconfirm, Tabs } from 'antd';
-import { ReloadOutlined, PlusOutlined, StopOutlined } from '@ant-design/icons';
+import { ReloadOutlined, PlusOutlined, StopOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { jobsApi, InferenceTask, TrainingTask } from '../../api/jobs';
 
@@ -85,6 +85,9 @@ export default function JobListPage() {
       title: '操作', key: 'actions',
       render: (_: unknown, record: TrainingTask) => (
         <Space size="small">
+          <Button type="link" size="small" icon={<FileTextOutlined />} onClick={() => navigate(`/jobs/${record.task_id}/logs`)}>
+            日志
+          </Button>
           {record.status === 'running' && (
             <Popconfirm title="确定取消此任务？" onConfirm={() => handleCancel(record.task_id)}>
               <Button type="link" size="small" danger icon={<StopOutlined />}>取消</Button>
@@ -107,6 +110,9 @@ export default function JobListPage() {
       title: '操作', key: 'actions',
       render: (_: unknown, record: InferenceTask) => (
         <Space size="small">
+          <Button type="link" size="small" icon={<FileTextOutlined />} onClick={() => navigate(`/jobs/${record.task_id}/logs`)}>
+            日志
+          </Button>
           {record.status === 'running' && (
             <Popconfirm title="确定取消此任务？" onConfirm={() => handleCancel(record.task_id)}>
               <Button type="link" size="small" danger icon={<StopOutlined />}>取消</Button>

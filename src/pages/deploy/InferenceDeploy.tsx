@@ -4,10 +4,10 @@ import {
   InputNumber, Switch, message, Popconfirm, Descriptions, Row, Col, Statistic
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined,
+  PlusOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined, EditOutlined,
   CloudServerOutlined, CheckCircleOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
-import { inferenceApi, type InferenceService, type CreateInferenceServiceRequest } from '../../api/inference';
+import { inferenceApi, type InferenceService, type CreateInferenceServiceRequest, type UpdateInferenceServiceRequest } from '../../api/inference';
 
 const { Title } = Typography;
 
@@ -22,9 +22,11 @@ export default function InferenceDeployPage() {
   const [services, setServices] = useState<InferenceService[]>([]);
   const [loading, setLoading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedService, setSelectedService] = useState<InferenceService | null>(null);
   const [form] = Form.useForm();
+  const [updateForm] = Form.useForm();
 
   useEffect(() => {
     fetchServices();
@@ -74,6 +76,41 @@ export default function InferenceDeployPage() {
     try {
       await inferenceApi.deleteService(name);
       message.success('推理服务已删除');
+      fetchServices();
+    } catch (error) {
+      // 错误已在拦截器处理
+    }
+  };
+
+  const handleOpenUpdate = (service: InferenceService) => {
+    setSelectedService(service);
+    updateForm.setFieldsValue({
+      replicas: service.replicas,
+      image: service.image,
+      cpu: service.cpu,
+      memory: service.memory,
+      gpu: service.gpu,
+      canaryEnabled: service.canary_enabled,
+      canaryTraffic: service.canary_traffic,
+    });
+    setUpdateModalVisible(true);
+  };
+
+  const handleUpdate = async (values: any) => {
+    if (!selectedService) return;
+    try {
+      const req: UpdateInferenceServiceRequest = {
+        replicas: values.replicas,
+        image: values.image,
+        cpu: values.cpu,
+        memory: values.memory,
+        gpu: values.gpu,
+        canary_enabled: values.canaryEnabled,
+        canary_traffic: values.canaryTraffic,
+      };
+      await inferenceApi.updateService(selectedService.name, req);
+      message.success('推理服务更新成功');
+      setUpdateModalVisible(false);
       fetchServices();
     } catch (error) {
       // 错误已在拦截器处理
@@ -150,6 +187,9 @@ export default function InferenceDeployPage() {
         <Space>
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
             详情
+          </Button>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleOpenUpdate(record)}>
+            更新
           </Button>
           <Popconfirm title="确定删除此推理服务？" onConfirm={() => handleDelete(record.name)} okText="删除" cancelText="取消">
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>
@@ -290,6 +330,68 @@ export default function InferenceDeployPage() {
             <Space>
               <Button type="primary" htmlType="submit">部署</Button>
               <Button onClick={() => setCreateModalVisible(false)}>取消</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 更新/扩缩容模态框 */}
+      <Modal
+        title="更新推理服务 / 扩缩容"
+        open={updateModalVisible}
+        onCancel={() => setUpdateModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <Alert
+          message="扩缩容提示"
+          description="修改副本数将触发 K8s 滚动更新，服务可能短暂不可用。"
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={updateForm} layout="vertical" onFinish={handleUpdate}>
+          <Form.Item name="replicas" label="副本数（扩缩容）" rules={[{ required: true }]}>
+            <InputNumber min={0} max={50} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="image" label="镜像地址（更新镜像）">
+            <Input placeholder="留空则不更新镜像" />
+          </Form.Item>
+          <Divider orientation="left">资源配置（留空则不更新）</Divider>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="cpu" label="CPU">
+                <Input placeholder="例如: 2, 4" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="memory" label="内存">
+                <Input placeholder="例如: 4Gi, 8Gi" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="gpu" label="GPU">
+                <Input placeholder="例如: 1" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Divider orientation="left">灰度发布配置</Divider>
+          <Form.Item name="canaryEnabled" label="启用灰度发布" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.canaryEnabled !== cur.canaryEnabled}>
+            {({ getFieldValue }) =>
+              getFieldValue('canaryEnabled') ? (
+                <Form.Item name="canaryTraffic" label="灰度流量比例 (%)">
+                  <InputNumber min={1} max={99} style={{ width: '100%' }} />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">确认更新</Button>
+              <Button onClick={() => setUpdateModalVisible(false)}>取消</Button>
             </Space>
           </Form.Item>
         </Form>

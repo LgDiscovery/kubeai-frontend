@@ -80,6 +80,16 @@ export interface TaskPodsResponse {
   };
 }
 
+export interface UpdateInferenceServiceRequest {
+  replicas?: number;
+  image?: string;
+  cpu?: string;
+  memory?: string;
+  gpu?: string;
+  canary_enabled?: boolean;
+  canary_traffic?: number;
+}
+
 export const inferenceApi = {
   // 推理服务管理
   listServices: () =>
@@ -90,6 +100,9 @@ export const inferenceApi = {
 
   createService: (data: CreateInferenceServiceRequest) =>
     apiClient.post<InferenceServiceDetailResponse>('/inference/services', data),
+
+  updateService: (name: string, data: UpdateInferenceServiceRequest) =>
+    apiClient.patch<InferenceServiceDetailResponse>(`/inference/services/${name}`, data),
 
   deleteService: (name: string) =>
     apiClient.delete(`/inference/services/${name}`),
