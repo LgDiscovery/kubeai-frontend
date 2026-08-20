@@ -7,75 +7,9 @@ import {
   PlusOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined,
   CloudServerOutlined, CheckCircleOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
+import { inferenceApi, type InferenceService, type CreateInferenceServiceRequest } from '../../api/inference';
 
 const { Title } = Typography;
-
-interface InferenceService {
-  name: string;
-  modelName: string;
-  modelVersion: string;
-  framework: string;
-  replicas: number;
-  readyReplicas: number;
-  status: 'Running' | 'Pending' | 'Failed' | 'Scaling';
-  cpu: string;
-  memory: string;
-  gpu?: string;
-  url: string;
-  createdAt: string;
-  canaryEnabled: boolean;
-  canaryTraffic?: number;
-}
-
-// 模拟数据
-const mockServices: InferenceService[] = [
-  {
-    name: 'bert-sentiment-v1',
-    modelName: 'bert-sentiment',
-    modelVersion: 'v1.0.0',
-    framework: 'PyTorch',
-    replicas: 2,
-    readyReplicas: 2,
-    status: 'Running',
-    cpu: '2',
-    memory: '4Gi',
-    gpu: '1',
-    url: 'http://bert-sentiment-v1.kubeai.svc.cluster.local',
-    createdAt: '2025-01-15T10:30:00Z',
-    canaryEnabled: false,
-  },
-  {
-    name: 'resnet-image-v2',
-    modelName: 'resnet-50',
-    modelVersion: 'v2.0.0',
-    framework: 'TensorFlow',
-    replicas: 3,
-    readyReplicas: 2,
-    status: 'Scaling',
-    cpu: '4',
-    memory: '8Gi',
-    gpu: '1',
-    url: 'http://resnet-image-v2.kubeai.svc.cluster.local',
-    createdAt: '2025-01-20T14:00:00Z',
-    canaryEnabled: true,
-    canaryTraffic: 20,
-  },
-  {
-    name: 'gpt2-text-v1',
-    modelName: 'gpt2-small',
-    modelVersion: 'v1.0.0',
-    framework: 'ONNX',
-    replicas: 1,
-    readyReplicas: 0,
-    status: 'Failed',
-    cpu: '4',
-    memory: '16Gi',
-    gpu: '1',
-    url: '',
-    createdAt: '2025-01-22T09:15:00Z',
-    canaryEnabled: false,
-  },
-];
 
 const statusColor: Record<string, string> = {
   Running: 'success',
@@ -96,51 +30,65 @@ export default function InferenceDeployPage() {
     fetchServices();
   }, []);
 
-  const fetchServices = () => {
+  const fetchServices = async () => {
     setLoading(true);
-    // 模拟 API 调用
-    setTimeout(() => {
-      setServices(mockServices);
+    try {
+      const res = await inferenceApi.listServices();
+      setServices(res.data.data.items);
+    } catch (error) {
+      // 错误已在拦截器处理
+      setServices([]);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   const handleCreate = async (values: any) => {
     try {
-      // 模拟创建
-      const newService: InferenceService = {
-        name: `${values.modelName}-${values.modelVersion}`,
-        modelName: values.modelName,
-        modelVersion: values.modelVersion,
-        framework: values.framework,
+      const req: CreateInferenceServiceRequest = {
+        name: values.name,
+        model_name: values.modelName,
+        model_version: values.modelVersion,
+        image: values.image,
         replicas: values.replicas,
-        readyReplicas: 0,
-        status: 'Pending',
+        port: values.port,
         cpu: values.cpu,
         memory: values.memory,
         gpu: values.gpu,
-        url: '',
-        createdAt: new Date().toISOString(),
-        canaryEnabled: values.canaryEnabled,
-        canaryTraffic: values.canaryTraffic,
+        canary_enabled: values.canaryEnabled,
+        canary_traffic: values.canaryTraffic,
+        enable_autoscaling: values.enableAutoscaling,
+        max_replicas: values.maxReplicas,
       };
-      setServices([...services, newService]);
-      message.success('推理服务创建成功，正在部署...');
+      await inferenceApi.createService(req);
+      message.success('推理服务创建成功');
       setCreateModalVisible(false);
       form.resetFields();
+      fetchServices();
     } catch (error) {
-      message.error('创建失败');
+      // 错误已在拦截器处理
     }
   };
 
-  const handleDelete = (name: string) => {
-    setServices(services.filter((s) => s.name !== name));
-    message.success('推理服务已删除');
+  const handleDelete = async (name: string) => {
+    try {
+      await inferenceApi.deleteService(name);
+      message.success('推理服务已删除');
+      fetchServices();
+    } catch (error) {
+      // 错误已在拦截器处理
+    }
   };
 
-  const handleViewDetail = (service: InferenceService) => {
-    setSelectedService(service);
-    setDetailModalVisible(true);
+  const handleViewDetail = async (service: InferenceService) => {
+    try {
+      const res = await inferenceApi.getService(service.name);
+      setSelectedService(res.data.data);
+      setDetailModalVisible(true);
+    } catch (error) {
+      setSelectedService(service);
+      setDetailModalVisible(true);
+    }
   };
 
   const columns = [
@@ -155,24 +103,16 @@ export default function InferenceDeployPage() {
       key: 'model',
       render: (_: any, record: InferenceService) => (
         <div>
-          <div>{record.modelName}</div>
-          <Tag color="blue" style={{ marginTop: 4 }}>{record.modelVersion}</Tag>
+          <div>{record.model_name}</div>
+          <Tag color="blue" style={{ marginTop: 4 }}>{record.model_version}</Tag>
         </div>
       ),
-    },
-    {
-      title: '框架',
-      dataIndex: 'framework',
-      key: 'framework',
-      render: (text: string) => <Tag>{text}</Tag>,
     },
     {
       title: '副本',
       key: 'replicas',
       render: (_: any, record: InferenceService) => (
-        <span>
-          {record.readyReplicas}/{record.replicas}
-        </span>
+        <span>{record.ready_replicas}/{record.replicas}</span>
       ),
     },
     {
@@ -180,8 +120,8 @@ export default function InferenceDeployPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={statusColor[status]} icon={status === 'Running' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}>
-          {status}
+        <Tag color={statusColor[status] || 'default'} icon={status === 'Running' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}>
+          {status || 'Unknown'}
         </Tag>
       ),
     },
@@ -190,18 +130,17 @@ export default function InferenceDeployPage() {
       key: 'resources',
       render: (_: any, record: InferenceService) => (
         <div style={{ fontSize: 12 }}>
-          <div>CPU: {record.cpu}</div>
-          <div>内存: {record.memory}</div>
+          <div>CPU: {record.cpu || '-'}</div>
+          <div>内存: {record.memory || '-'}</div>
           {record.gpu && <div>GPU: {record.gpu}</div>}
         </div>
       ),
     },
     {
       title: '灰度',
-      dataIndex: 'canaryEnabled',
       key: 'canary',
-      render: (enabled: boolean, record: InferenceService) => (
-        enabled ? <Tag color="orange">{record.canaryTraffic}%</Tag> : <Tag>-</Tag>
+      render: (_: any, record: InferenceService) => (
+        record.canary_enabled ? <Tag color="orange">{record.canary_traffic}%</Tag> : <Tag>-</Tag>
       ),
     },
     {
@@ -241,24 +180,16 @@ export default function InferenceDeployPage() {
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
-          <Card>
-            <Statistic title="总服务数" value={services.length} prefix={<CloudServerOutlined />} />
-          </Card>
+          <Card><Statistic title="总服务数" value={services.length} prefix={<CloudServerOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic title="运行中" value={services.filter((s) => s.status === 'Running').length} valueStyle={{ color: '#3f8600' }} prefix={<CheckCircleOutlined />} />
-          </Card>
+          <Card><Statistic title="运行中" value={services.filter((s) => s.status === 'Running').length} valueStyle={{ color: '#3f8600' }} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic title="异常" value={services.filter((s) => s.status === 'Failed').length} valueStyle={{ color: '#cf1322' }} prefix={<ExclamationCircleOutlined />} />
-          </Card>
+          <Card><Statistic title="异常" value={services.filter((s) => s.status === 'Failed').length} valueStyle={{ color: '#cf1322' }} prefix={<ExclamationCircleOutlined />} /></Card>
         </Col>
         <Col span={6}>
-          <Card>
-            <Statistic title="总副本数" value={services.reduce((sum, s) => sum + s.replicas, 0)} />
-          </Card>
+          <Card><Statistic title="总副本数" value={services.reduce((sum, s) => sum + s.replicas, 0)} /></Card>
         </Col>
       </Row>
 
@@ -277,6 +208,18 @@ export default function InferenceDeployPage() {
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           <Row gutter={16}>
             <Col span={12}>
+              <Form.Item name="name" label="服务名称" rules={[{ required: true, message: '请输入服务名称' }]}>
+                <Input placeholder="例如: bert-sentiment-v1" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="image" label="镜像地址（可选）">
+                <Input placeholder="自定义推理镜像，留空使用默认" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
               <Form.Item name="modelName" label="模型名称" rules={[{ required: true }]}>
                 <Input placeholder="例如: bert-sentiment" />
               </Form.Item>
@@ -288,42 +231,48 @@ export default function InferenceDeployPage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="framework" label="推理框架" rules={[{ required: true }]}>
-                <Select
-                  placeholder="选择框架"
-                  options={[
-                    { label: 'PyTorch', value: 'PyTorch' },
-                    { label: 'TensorFlow', value: 'TensorFlow' },
-                    { label: 'ONNX Runtime', value: 'ONNX' },
-                    { label: 'Triton', value: 'Triton' },
-                  ]}
-                />
+            <Col span={8}>
+              <Form.Item name="replicas" label="副本数" initialValue={1} rules={[{ required: true }]}>
+                <InputNumber min={1} max={20} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="replicas" label="副本数" initialValue={1}>
-                <InputNumber min={1} max={10} style={{ width: '100%' }} />
+            <Col span={8}>
+              <Form.Item name="port" label="服务端口" initialValue={8501}>
+                <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="gpu" label="GPU 数量">
+                <Input placeholder="例如: 1 (留空则不使用GPU)" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="cpu" label="CPU 请求" initialValue="2">
+              <Form.Item name="cpu" label="CPU 请求" initialValue="2" rules={[{ required: true }]}>
                 <Input placeholder="例如: 2, 4" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="memory" label="内存请求" initialValue="4Gi">
+              <Form.Item name="memory" label="内存请求" initialValue="4Gi" rules={[{ required: true }]}>
                 <Input placeholder="例如: 4Gi, 8Gi" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="gpu" label="GPU 数量">
-                <Input placeholder="例如: 1, 2 (留空则不使用GPU)" />
+              <Form.Item name="enableAutoscaling" label="启用自动扩缩容" valuePropName="checked">
+                <Switch />
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.enableAutoscaling !== cur.enableAutoscaling}>
+            {({ getFieldValue }) =>
+              getFieldValue('enableAutoscaling') ? (
+                <Form.Item name="maxReplicas" label="最大副本数" initialValue={5}>
+                  <InputNumber min={1} max={50} style={{ width: '100%' }} />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
           <Divider orientation="left">灰度发布配置（可选）</Divider>
           <Form.Item name="canaryEnabled" label="启用灰度发布" valuePropName="checked">
             <Switch />
@@ -339,9 +288,7 @@ export default function InferenceDeployPage() {
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
-                部署
-              </Button>
+              <Button type="primary" htmlType="submit">部署</Button>
               <Button onClick={() => setCreateModalVisible(false)}>取消</Button>
             </Space>
           </Form.Item>
@@ -353,31 +300,27 @@ export default function InferenceDeployPage() {
         title="推理服务详情"
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setDetailModalVisible(false)}>
-            关闭
-          </Button>,
-        ]}
+        footer={[<Button key="close" onClick={() => setDetailModalVisible(false)}>关闭</Button>]}
         width={700}
       >
         {selectedService && (
           <Descriptions bordered column={2}>
             <Descriptions.Item label="服务名称" span={2}>{selectedService.name}</Descriptions.Item>
-            <Descriptions.Item label="模型名称">{selectedService.modelName}</Descriptions.Item>
-            <Descriptions.Item label="模型版本">{selectedService.modelVersion}</Descriptions.Item>
-            <Descriptions.Item label="框架">{selectedService.framework}</Descriptions.Item>
+            <Descriptions.Item label="模型名称">{selectedService.model_name}</Descriptions.Item>
+            <Descriptions.Item label="模型版本">{selectedService.model_version}</Descriptions.Item>
+            <Descriptions.Item label="镜像">{selectedService.image || '-'}</Descriptions.Item>
             <Descriptions.Item label="状态">
-              <Tag color={statusColor[selectedService.status]}>{selectedService.status}</Tag>
+              <Tag color={statusColor[selectedService.status] || 'default'}>{selectedService.status || 'Unknown'}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="副本数">{selectedService.readyReplicas}/{selectedService.replicas}</Descriptions.Item>
-            <Descriptions.Item label="CPU">{selectedService.cpu}</Descriptions.Item>
-            <Descriptions.Item label="内存">{selectedService.memory}</Descriptions.Item>
+            <Descriptions.Item label="副本数">{selectedService.ready_replicas}/{selectedService.replicas}</Descriptions.Item>
+            <Descriptions.Item label="CPU">{selectedService.cpu || '-'}</Descriptions.Item>
+            <Descriptions.Item label="内存">{selectedService.memory || '-'}</Descriptions.Item>
             <Descriptions.Item label="GPU">{selectedService.gpu || '-'}</Descriptions.Item>
             <Descriptions.Item label="访问地址" span={2}>
               {selectedService.url || <span style={{ color: '#999' }}>未分配</span>}
             </Descriptions.Item>
-            <Descriptions.Item label="灰度发布">{selectedService.canaryEnabled ? `已启用 (${selectedService.canaryTraffic}%)` : '未启用'}</Descriptions.Item>
-            <Descriptions.Item label="创建时间">{new Date(selectedService.createdAt).toLocaleString()}</Descriptions.Item>
+            <Descriptions.Item label="灰度发布">{selectedService.canary_enabled ? `已启用 (${selectedService.canary_traffic}%)` : '未启用'}</Descriptions.Item>
+            <Descriptions.Item label="创建时间">{new Date(selectedService.created_at).toLocaleString()}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>
