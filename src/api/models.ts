@@ -88,7 +88,26 @@ export const modelsApi = {
     framework_version?: string;
     metrics?: string;
     parameters?: string;
-  }) => apiClient.post<ModelVersion>(`/models/${name}/versions`, data),
+    file?: File;
+  }) => {
+    // 如果有文件，使用 FormData
+    if (data.file) {
+      const formData = new FormData();
+      formData.append('name', data.name);
+      formData.append('version', data.version);
+      if (data.description) formData.append('description', data.description);
+      if (data.framework) formData.append('framework', data.framework);
+      if (data.framework_version) formData.append('framework_version', data.framework_version);
+      if (data.metrics) formData.append('metrics', data.metrics);
+      if (data.parameters) formData.append('parameters', data.parameters);
+      formData.append('file', data.file);
+      return apiClient.post<ModelVersion>(`/models/${name}/versions`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 300000, // 5分钟超时，大文件上传
+      });
+    }
+    return apiClient.post<ModelVersion>(`/models/${name}/versions`, data);
+  },
 
   listVersions: (name: string) =>
     apiClient.get<{ items: ModelVersion[] }>(`/models/${name}/versions`),

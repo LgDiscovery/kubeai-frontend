@@ -12,6 +12,7 @@ import {
   LogoutOutlined,
   UserOutlined,
   ApiOutlined,
+  CloudServerOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -35,6 +36,7 @@ const menuItems = [
     label: '推理服务',
     children: [
       { key: '/inference/execute', label: '执行推理' },
+      { key: '/inference/deploy', label: '服务部署管理' },
     ],
   },
   {
