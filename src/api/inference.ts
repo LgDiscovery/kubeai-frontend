@@ -120,4 +120,11 @@ export const inferenceApi = {
 
   listTaskPods: (taskId: string) =>
     apiClient.get<TaskPodsResponse>(`/inference/tasks/${taskId}/pods`),
+
+  // 健康检查
+  healthCheck: () =>
+    apiClient.get('/inference/health'),
+
+  readyCheck: () =>
+    apiClient.get('/inference/ready'),
 };
