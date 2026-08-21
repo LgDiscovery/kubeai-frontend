@@ -31,7 +31,7 @@ export default function HealthCheckPage() {
     const updated = [...services];
 
     const checks: Array<{ index: number; healthFn: () => Promise<any>; readyFn: () => Promise<any> }> = [
-      { index: 0, healthFn: () => fetch('/api/v1/auth/metrics'), readyFn: () => fetch('/api/v1/auth/metrics') },
+      { index: 0, healthFn: () => fetch('/api/v1/auth/health'), readyFn: () => fetch('/api/v1/auth/ready') },
       { index: 1, healthFn: () => modelsApi.healthCheck(), readyFn: () => modelsApi.readyCheck() },
       { index: 2, healthFn: () => jobsApi.healthCheck(), readyFn: () => jobsApi.readyCheck() },
       { index: 3, healthFn: () => inferenceApi.healthCheck(), readyFn: () => inferenceApi.readyCheck() },
@@ -140,7 +140,7 @@ export default function HealthCheckPage() {
       <Card title="服务端点信息" size="small">
         <Row gutter={[16, 8]}>
           {[
-            { name: 'API网关', url: '/api/v1/auth/metrics', port: '8080' },
+            { name: 'API网关', url: '/api/v1/auth/health', port: '8080' },
             { name: '模型管理', url: '/api/v1/models/health', port: '58080' },
             { name: '任务调度', url: '/api/v1/jobs/health', port: '58081' },
             { name: '推理网关', url: '/api/v1/inference/health', port: '58082' },
